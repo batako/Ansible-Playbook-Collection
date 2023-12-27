@@ -1,0 +1,34 @@
+- name: nvm と Node.js をインストール
+  hosts: localhost
+  vars:
+    nvm_version:
+    node_version: "18.18.2"
+
+  tasks:
+    - name: nvm_version に v を補完
+      set_fact:
+        _nvm_version: "v{{ nvm_version }}"
+      when:
+        - nvm_version is not none
+        - nvm_version | length > 1
+
+    - name: GitHub から nvm の最新リリースを取得
+      uri:
+        url: https://api.github.com/repos/nvm-sh/nvm/releases/latest
+        method: GET
+        return_content: yes
+        headers:
+          Accept: application/vnd.github.v3+json
+      register: nvm_release
+      when: _nvm_version is not defined
+
+    - name: 定義されていない場合に nvm のバージョンを最新に設定
+      set_fact:
+        _nvm_version: "{{ nvm_release.json.tag_name }}"
+      when: _nvm_version is not defined
+
+    - name: nvm インストールスクリプトのダウンロードと実行
+      shell: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ _nvm_version }}/install.sh | bash
+
+    - name: Node.js のインストール
+      command: bash -lc "nvm install {{ node_version }}"
